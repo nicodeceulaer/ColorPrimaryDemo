@@ -34,7 +34,7 @@ import java.util.List;
 
 public class ColorDemo extends ListActivity {
     private static final String TAG = "colorlist";
-    private static final int BAD_COLOR = 0xdeadbeef;
+    private static final int DEFAULT_COLOR = 0xdeadbeef;  // easy to spot in the UI !
     AppAdapter adapter=null;
 
     @Override
@@ -98,7 +98,28 @@ public class ColorDemo extends ListActivity {
 
         private int GetColorFromPackage( Context localContext, String packageName ) {
             ResolveInfo resolveInfo = ResolvePackage( packageName );
-            if( resolveInfo == null) { return BAD_COLOR; }
+            if( resolveInfo == null) { return DEFAULT_COLOR; }  // handle package not found error
+
+            try {
+                Context remoteCtx = createPackageContext( packageName, Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY);
+                Resources.Theme remoteTheme = remoteCtx.getTheme();
+                remoteTheme.applyStyle( resolveInfo.activityInfo.getThemeResource(), true );
+                int [] theme_id_list = { android.R.attr.colorPrimary };
+                TypedArray ta = remoteTheme.obtainStyledAttributes( theme_id_list );
+                int color = ta.getColor(0, DEFAULT_COLOR);
+                ta.recycle();
+
+                return color;
+            }
+            catch (PackageManager.NameNotFoundException localNameNotFoundException) {
+                Log.i(TAG, "package name not found: " + packageName );
+            }
+            return DEFAULT_COLOR;
+        }
+
+        private int GetColorFromPackage2( Context localContext, String packageName ) {
+            ResolveInfo resolveInfo = ResolvePackage( packageName );
+            if( resolveInfo == null) { return DEFAULT_COLOR; }
 
           try
           {
@@ -122,7 +143,7 @@ public class ColorDemo extends ListActivity {
               if( colorPrimaryId != 230 ){
                   Log.i(TAG, "the offset 230 should be = " + colorPrimaryId );
                   Log.i(TAG, "wrong colorPrimaryId for package " + packageName );
-                  return BAD_COLOR;
+                  return DEFAULT_COLOR;
               }
 
               int [] theme_id_list = { android.R.attr.colorPrimary };
@@ -133,7 +154,7 @@ public class ColorDemo extends ListActivity {
 
               if( color != color2 ) {
                   Log.i(TAG, "found color difference for package " + packageName);
-                  return BAD_COLOR;
+                  return DEFAULT_COLOR;
               }
 
               return color;
@@ -143,8 +164,8 @@ public class ColorDemo extends ListActivity {
               localNameNotFoundException.printStackTrace();
           }
 
-          Log.i(TAG, "took backup color : " + BAD_COLOR );
-          return BAD_COLOR;
+          Log.i(TAG, "took backup color : " + DEFAULT_COLOR );
+          return DEFAULT_COLOR;
         }
 
         @Override
@@ -153,6 +174,14 @@ public class ColorDemo extends ListActivity {
             ResolveInfo ri = getItem( position );
             String packageName = ri.activityInfo.packageName;
             int color = GetColorFromPackage( getContext(), packageName);
+            int color2 = GetColorFromPackage2( getContext(), packageName );
+
+            if( color != color2 ) {
+                Log.i(TAG, "mismatching colors for package " + packageName +
+                           " color1:" + Integer.toHexString(color) +
+                           " color2:" + Integer.toHexString(color2) );
+                color = DEFAULT_COLOR;  // fall back to default so we can see this error on the UI
+            }
 
             View row=super.getView(position, convertView, parent);
             View sample=(View)row.findViewById(R.id.sample);
